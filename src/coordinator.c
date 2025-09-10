@@ -7,6 +7,8 @@
 #include <fcntl.h>
 #include <time.h>
 #include "hash_utils.h"
+#include <errno.h>
+
 
 /**
  * PROCESSO COORDENADOR - Mini-Projeto 1: Quebra de Senhas Paralelo
@@ -193,8 +195,10 @@ int main(int argc, char *argv[]) {
     while (active_workers > 0) {
         int status;
         pid_t finished_pid = wait(&status);
-        
         if (finished_pid == -1) {
+            // Se não há mais filhos, encerra; se foi sinal, tenta de novo
+            if (errno == ECHILD) break;
+            if (errno == EINTR)  continue;
             perror("Erro no wait");
             continue;
         }

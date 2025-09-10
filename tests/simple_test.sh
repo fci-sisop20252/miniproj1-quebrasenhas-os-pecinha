@@ -71,12 +71,14 @@ run_test() {
     fi
     
     # Verificar conteúdo do arquivo
-    local found_password=$(cut -d':' -f2 password_found.txt | tr -d '\n\r ')
+    local found_password
+    found_password=$(cut -d':' -f2 password_found.txt | tr -d '\n\r ')
     if [ "$found_password" = "$expected_password" ]; then
         echo -e "${GREEN}✓ PASSOU: Senha '$found_password' encontrada corretamente${NC}"
         
         # Verificar se o hash está correto
-        local computed_hash=$(./test_hash "$found_password" | grep "MD5:" | awk '{print $2}')
+        local computed_hash
+        computed_hash=$(./test_hash "$found_password" | grep "MD5:" | awk '{print $2}')
         if [ "$computed_hash" = "$hash" ]; then
             echo -e "${GREEN}✓ Hash verificado corretamente${NC}"
             TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -91,8 +93,9 @@ run_test() {
         TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
     
-    # Mostrar tempo de execução
-    local tempo=$(grep "Tempo total:" test_output.tmp | awk '{print $3}')
+    # Mostrar tempo de execução (captura linha 'Tempo total de execução: X.XXX s')
+    local tempo
+    tempo=$(grep -E "Tempo total" test_output.tmp | awk '{print $(NF-1)}')
     if [ -n "$tempo" ]; then
         echo "Tempo de execução: ${tempo}s"
     fi
@@ -118,10 +121,13 @@ performance_test() {
         end_time=$(date +%s.%N)
         
         if [ -f "password_found.txt" ]; then
-            local found_password=$(cut -d':' -f2 password_found.txt | tr -d '\n\r ')
+            local found_password
+            found_password=$(cut -d':' -f2 password_found.txt | tr -d '\n\r ')
             if [ "$found_password" = "$expected_password" ]; then
-                local elapsed=$(echo "$end_time - $start_time" | bc -l)
-                echo -e "${GREEN}$(printf "%.2f" $elapsed)s${NC}"
+                # Cálculo de tempo sem 'bc'
+                local elapsed
+                elapsed=$(awk -v s="$start_time" -v e="$end_time" 'BEGIN{printf "%.2f", e - s}')
+                echo -e "${GREEN}${elapsed}s${NC}"
             else
                 echo -e "${RED}senha incorreta${NC}"
             fi
@@ -168,9 +174,10 @@ run_test "Senha Numérica (123)" \
     "4" \
     "123"
 
-# Teste 3: Senha no final do espaço
+# Teste 3: Senha no final do espaço (zzz)
+# Corrigido: MD5 correto de "zzz"
 run_test "Senha no Final (zzz)" \
-    "15de21c670ae7c3f6f3f1f37029303c9" \
+    "f3abb86bd34cf4d52698f14c0da1dc60" \
     "3" \
     "xyz" \
     "3" \
@@ -201,13 +208,14 @@ performance_test "Speedup Test" \
     "0123456789" \
     "123"
 
-# Teste de Edge Cases
+# Testes de Edge Cases
 echo -e "\n${YELLOW}[Testes de Edge Cases]${NC}"
 
 echo -n "Argumentos insuficientes: "
 ./coordinator 2>/dev/null
 if [ $? -ne 0 ]; then
     echo -e "${GREEN}✓ Erro tratado corretamente${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
 else
     echo -e "${RED}✗ Deveria retornar erro${NC}"
     TESTS_FAILED=$((TESTS_FAILED + 1))
@@ -224,16 +232,16 @@ else
     TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 
-# Verificar processos zumbi
+# Verificar processos zumbi (conta processos em estado 'Z')
 echo -n "Verificando processos zumbi: "
 ./coordinator "900150983cd24fb0d6963f7d28e17f72" "3" "abc" "4" >/dev/null 2>&1
 sleep 1
-ZOMBIES=$(ps aux | grep defunct | wc -l)
-if [ $ZOMBIES -eq 0 ]; then
+ZOMBIES=$(ps -eo stat,comm | awk '$1 ~ /Z/ {count++} END{print count+0}')
+if [ "$ZOMBIES" -eq 0 ]; then
     echo -e "${GREEN}✓ Nenhum processo zumbi${NC}"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
-    echo -e "${RED}✗ $ZOMBIES processo(s) zumbi encontrado(s)${NC}"
+    echo -e "${RED}✗ ${ZOMBIES} processo(s) zumbi encontrado(s)${NC}"
     TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 
