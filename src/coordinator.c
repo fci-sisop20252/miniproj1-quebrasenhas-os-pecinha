@@ -254,7 +254,16 @@ int main(int argc, char *argv[]) {
     
     // Estatísticas finais (opcional)
     // TODO: Calcular e exibir estatísticas de performance
-    printf("Tempo total de execução: %.2f segundos\n", elapsed_time);
+ // === Estatísticas de performance ===
+    printf("\n=== Estatísticas de performance ===\n");
+    printf("Workers: %d\n", num_workers);
+    printf("Espaço total de busca: %lld combinações\n", total_space);
+    printf("Tempo total de execução: %.2f s\n", elapsed_time);
+
+    double throughput = (elapsed_time > 0.0) ? ((double)total_space / elapsed_time) : 0.0;
+    printf("Vazão média (global): %.2f senhas/seg\n", throughput);
+    printf("Vazão média por worker: %.2f senhas/seg\n", (num_workers > 0) ? (throughput / num_workers) : 0.0);
+
     
     return 0;
 }
